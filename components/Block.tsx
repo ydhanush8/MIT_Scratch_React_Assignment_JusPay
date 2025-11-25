@@ -24,15 +24,30 @@ export function Block({ block, index, spriteId, onUpdate, onRemove, onMove, onAd
     }),
   }));
   
-  const [{ isOver }, drop] = useDrop<DragItem, void, { isOver: boolean }>(() => ({
+  const [{ isOver, canDrop }, drop] = useDrop<DragItem, void, { isOver: boolean; canDrop: boolean }>(() => ({
     accept: 'BLOCK',
-    drop: (item: DragItem) => {
-      if (item.sourceIndex !== undefined && item.sourceIndex !== index) {
-        onMove(item.sourceIndex, index);
+    canDrop: (item: DragItem) => {
+      // Can't drop a block onto itself
+      return item.sourceIndex !== index || item.spriteId !== spriteId;
+    },
+    drop: (item: DragItem, monitor) => {
+      if (!monitor.canDrop()) return;
+      
+      if (item.sourceIndex !== undefined && item.spriteId === spriteId) {
+        // Calculate target index - if dragging down, account for the removal
+        let targetIndex = index;
+        if (item.sourceIndex < index) {
+          targetIndex = index;
+        } else if (item.sourceIndex > index) {
+          targetIndex = index + 1;
+        }
+        
+        onMove(item.sourceIndex, targetIndex);
       }
     },
     collect: (monitor) => ({
-      isOver: monitor.isOver(),
+      isOver: monitor.isOver({ shallow: true }),
+      canDrop: monitor.canDrop(),
     }),
   }));
   
@@ -96,8 +111,13 @@ export function Block({ block, index, spriteId, onUpdate, onRemove, onMove, onAd
   return (
     <div
       ref={drop as any}
-      className={`mb-2 ${isOver ? 'mt-8' : ''}`}
+      className={`mb-2 relative ${isOver && canDrop ? 'mt-4' : ''}`}
     >
+      {/* Drop indicator */}
+      {isOver && canDrop && (
+        <div className="absolute -top-1 left-0 right-0 h-1 bg-blue-400 rounded-full shadow-lg z-10" />
+      )}
+      
       <div
         ref={drag as any}
         className={`${definition.color} text-white px-3 py-2 rounded-lg cursor-move shadow-md hover:shadow-lg transition-shadow ${

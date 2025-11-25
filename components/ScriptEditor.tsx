@@ -10,22 +10,38 @@ export function ScriptEditor() {
   const selectedSprite = getSelectedSprite();
   
   const [{ isOver }, drop] = useDrop<DragItem, void, { isOver: boolean }>(() => ({
-    accept: 'PALETTE_BLOCK',
-    drop: (item: DragItem) => {
-      if (!selectedSprite || !item.blockType || !item.category) return;
+    accept: ['PALETTE_BLOCK', 'BLOCK'],
+    drop: (item: DragItem, monitor) => {
+      // Only handle drops directly on the script editor, not on individual blocks
+      if (monitor.didDrop()) return;
       
-      const newBlock: BlockType = {
-        id: `block-${Date.now()}-${Math.random()}`,
-        type: item.blockType,
-        category: item.category,
-        parameters: [...BLOCK_DEFINITIONS[item.blockType].defaultParameters],
-        children: BLOCK_DEFINITIONS[item.blockType].isContainer ? [] : undefined,
-      };
+      if (!selectedSprite) return;
       
-      updateSpriteScript(selectedSprite.id, [...selectedSprite.script, newBlock]);
+      // Handle palette block drops - add to end
+      if (item.type === 'PALETTE_BLOCK' && item.blockType && item.category) {
+        const newBlock: BlockType = {
+          id: `block-${Date.now()}-${Math.random()}`,
+          type: item.blockType,
+          category: item.category,
+          parameters: [...BLOCK_DEFINITIONS[item.blockType].defaultParameters],
+          children: BLOCK_DEFINITIONS[item.blockType].isContainer ? [] : undefined,
+        };
+        
+        updateSpriteScript(selectedSprite.id, [...selectedSprite.script, newBlock]);
+      }
+      
+      // Handle block reordering - move to end if dropped on empty area
+      if (item.type === 'BLOCK' && item.sourceIndex !== undefined && item.spriteId === selectedSprite.id) {
+        // Moving within the same sprite - handled by Block component's drop zones
+        // This handles the case where a block is dropped in the empty area
+        const newScript = [...selectedSprite.script];
+        const [movedBlock] = newScript.splice(item.sourceIndex, 1);
+        newScript.push(movedBlock);
+        updateSpriteScript(selectedSprite.id, newScript);
+      }
     },
     collect: (monitor) => ({
-      isOver: monitor.isOver(),
+      isOver: monitor.isOver({ shallow: true }),
     }),
   }));
   
@@ -52,7 +68,11 @@ export function ScriptEditor() {
   const moveBlock = (fromIndex: number, toIndex: number) => {
     const newScript = [...selectedSprite.script];
     const [movedBlock] = newScript.splice(fromIndex, 1);
-    newScript.splice(toIndex, 0, movedBlock);
+    
+    // Adjust toIndex if moving down (since we removed one element)
+    const adjustedToIndex = fromIndex < toIndex ? toIndex - 1 : toIndex;
+    
+    newScript.splice(adjustedToIndex, 0, movedBlock);
     updateSpriteScript(selectedSprite.id, newScript);
   };
   

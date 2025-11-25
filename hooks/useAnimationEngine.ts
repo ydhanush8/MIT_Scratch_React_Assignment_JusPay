@@ -33,14 +33,14 @@ export function useAnimationEngine() {
       if (sprite.script.length > 0) {
         executingSprites.current.add(sprite.id);
         
-        // Get fresh sprite reference for execution
-        const getCurrentSprite = () => {
-          return useScratchStore.getState().getSpriteById(sprite.id);
+        // Create a getter function that always returns fresh sprite state
+        const getSpriteState = () => {
+          return useScratchStore.getState().getSpriteById(sprite.id) || sprite;
         };
         
         executeScript(
           sprite.script,
-          sprite,
+          getSpriteState,
           (updates) => updateSprite(sprite.id, updates),
           () => shouldStopRef.current
         ).then(() => {

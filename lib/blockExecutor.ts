@@ -1,5 +1,6 @@
 import { Block, BlockType, Sprite } from './types';
 
+export type SpriteGetter = () => Sprite;
 export type SpriteUpdater = (updates: Partial<Sprite>) => void;
 
 /**
@@ -7,26 +8,28 @@ export type SpriteUpdater = (updates: Partial<Sprite>) => void;
  */
 export async function executeBlock(
   block: Block,
-  sprite: Sprite,
+  getSpriteState: SpriteGetter,
   updateSprite: SpriteUpdater
 ): Promise<void> {
+  const sprite = getSpriteState(); // Get fresh sprite state
+  
   switch (block.type) {
     case BlockType.MOVE_STEPS: {
       const steps = Number(block.parameters[0]?.value || 0);
-      await animateMovement(sprite, steps, updateSprite);
+      await animateMovement(getSpriteState, steps, updateSprite);
       break;
     }
     
     case BlockType.TURN_DEGREES: {
       const degrees = Number(block.parameters[0]?.value || 0);
-      await animateRotation(sprite, degrees, updateSprite);
+      await animateRotation(getSpriteState, degrees, updateSprite);
       break;
     }
     
     case BlockType.GO_TO_XY: {
       const x = Number(block.parameters[0]?.value || 0);
       const y = Number(block.parameters[1]?.value || 0);
-      await animateGoTo(sprite, x, y, updateSprite);
+      await animateGoTo(getSpriteState, x, y, updateSprite);
       break;
     }
     
@@ -50,7 +53,7 @@ export async function executeBlock(
       
       for (let i = 0; i < times; i++) {
         for (const childBlock of children) {
-          await executeBlock(childBlock, sprite, updateSprite);
+          await executeBlock(childBlock, getSpriteState, updateSprite);
         }
       }
       break;
@@ -62,25 +65,27 @@ export async function executeBlock(
  * Animate movement in the current direction
  */
 async function animateMovement(
-  sprite: Sprite,
+  getSpriteState: SpriteGetter,
   steps: number,
   updateSprite: SpriteUpdater
 ): Promise<void> {
+  const sprite = getSpriteState();
   const radians = (sprite.rotation * Math.PI) / 180;
   const targetX = sprite.x + steps * Math.cos(radians);
   const targetY = sprite.y + steps * Math.sin(radians);
   
-  return animateToPosition(sprite, targetX, targetY, updateSprite);
+  return animateToPosition(getSpriteState, targetX, targetY, updateSprite);
 }
 
 /**
  * Animate rotation
  */
 async function animateRotation(
-  sprite: Sprite,
+  getSpriteState: SpriteGetter,
   degrees: number,
   updateSprite: SpriteUpdater
 ): Promise<void> {
+  const sprite = getSpriteState();
   const startRotation = sprite.rotation;
   const targetRotation = sprite.rotation + degrees;
   const duration = 300; // ms
@@ -109,11 +114,12 @@ async function animateRotation(
  * Animate to a specific position
  */
 async function animateToPosition(
-  sprite: Sprite,
+  getSpriteState: SpriteGetter,
   targetX: number,
   targetY: number,
   updateSprite: SpriteUpdater
 ): Promise<void> {
+  const sprite = getSpriteState();
   const startX = sprite.x;
   const startY = sprite.y;
   const duration = 500; // ms
@@ -144,12 +150,12 @@ async function animateToPosition(
  * Animate go to x, y
  */
 async function animateGoTo(
-  sprite: Sprite,
+  getSpriteState: SpriteGetter,
   x: number,
   y: number,
   updateSprite: SpriteUpdater
 ): Promise<void> {
-  return animateToPosition(sprite, x, y, updateSprite);
+  return animateToPosition(getSpriteState, x, y, updateSprite);
 }
 
 /**
@@ -176,7 +182,7 @@ async function showBubble(
  */
 export async function executeScript(
   blocks: Block[],
-  sprite: Sprite,
+  getSpriteState: SpriteGetter,
   updateSprite: SpriteUpdater,
   shouldStop: () => boolean
 ): Promise<void> {
@@ -184,6 +190,6 @@ export async function executeScript(
     if (shouldStop()) {
       break;
     }
-    await executeBlock(block, sprite, updateSprite);
+    await executeBlock(block, getSpriteState, updateSprite);
   }
 }
